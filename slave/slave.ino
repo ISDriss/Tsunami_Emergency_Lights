@@ -4,9 +4,10 @@
 #include <Adafruit_SSD1306.h>
 #include "../credentials.h"
 
-#define LED 2
+#define LED 10
 
 //WiFiServer server(8080);
+IPAddress SIPA;
 WiFiClient client;
 bool connected = false;
 bool alerted = false;
@@ -56,6 +57,7 @@ void ComsSetup(IPAddress serverIP){
 
 void Checkmessage(){
     String response = client.readStringUntil('\n');
+    Serial.println(response);
     if(response == "Alert"){
         alerted = true;
     }
@@ -67,7 +69,7 @@ void Checkmessage(){
 
 void Alert(){
     digitalWrite(LED, HIGH);
-    delay(500);
+    delay(1000);
     digitalWrite(LED, LOW);
 }
 
@@ -75,24 +77,25 @@ void Alert(){
 void setup() {
     //base Setup
     Serial.begin(9600);
+    pinMode(LED, OUTPUT);
     WiFiSetup();
 
     //Card connection
-    IPAddress SIP = MDNSSetup();
-    ComsSetup(SIP);
+    SIPA = MDNSSetup();
+    ComsSetup(SIPA);
 }
 
 void loop() {
     if(alerted){
         Alert();
     }
-    while(!connected){
-        if(client.connected()){
-            connected = true;
-        }
-    }   
-    while(connected){
-        Checkmessage();
-        delay(20);
+    if(client.connected()){
+      Checkmessage();
     }
+    else {
+      //client does not detect server deconnection
+      //does not reconnect once the server back online
+      ComsSetup(SIPA);
+    }
+    delay(20);
 }

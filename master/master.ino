@@ -63,7 +63,7 @@ void ComsSetup(IPAddress serverIP){
 
 void GetKeyboard(){
   char input = keypad.getKey();
-  Serial.println(input);
+  //Serial.println(input);
   if(keypad.isPressed('U')){
     OH_NO_ITS_HAPPENING = true;
   } else if(keypad.isPressed('D')){
@@ -83,20 +83,20 @@ void setup() {
 }
 
 void loop() {
-    while(!connected){
-        client = server.available();
-        if(client){
-            connected = true;
-        }
-    }
-
-    while(connected){
+    if(client){
         GetKeyboard();
+        Serial.println(OH_NO_ITS_HAPPENING);
         if(OH_NO_ITS_HAPPENING){
             client.println("Alert");
         } else{
             client.println("Stop");
         }
-        delay(20);
     }
+    else{  
+      //server does not detect the disconnection of the client
+      //but can reconnect to it if client attempt reconnection
+      Serial.println("lost client");
+      client = server.available();
+    }
+    delay(20);
 }
