@@ -1,112 +1,158 @@
 #include <WiFi.h>
 #include <ESPmDNS.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
 #include "../credentials.h"
 
-//WiFiServer server(8080);
+// Configuration des pins
+#define LED1 4  // Première LED du chemin lumineux
+#define LED2 2  // Deuxième LED du chemin lumineux
+#define LED_MORSE 9  // LEDs en série pour le code Morse
+
+// Variables globales
 IPAddress SIPA;
 WiFiClient client;
 bool connected = false;
 bool alerted = false;
 
+// Variables pour le chemin lumineux
+unsigned long pathPreviousMillis = 0;
+const long pathInterval = 500; // Intervalle pour alterner les LEDs du chemin
+int pathState = 0;
+
+// Variables pour le code Morse SOS
+unsigned long morsePreviousMillis = 0;
+int morseIndex = 0;
+bool morseState = false;
+const int morsePattern[] = {1, 0, 1, 0, 1, 0, 3, 0, 3, 0, 3, 0, 1, 0, 1, 0, 1, 0}; // "SOS" en Morse
+const int morseUnit = 1000; // Durée d'une unité Morse (1000 ms)
+
 void WiFiSetup() {
-    WiFi.begin(ssid,password);
-    Serial.print("Connecting to Wifi");
-    while(WiFi.status() != WL_CONNECTED){
+    WiFi.begin(ssid, password);
+    Serial.print("Connecting to WiFi");
+    while (WiFi.status() != WL_CONNECTED) {
         delay(1000);
         Serial.print(".");
     }
-    Serial.println("Connected to Wifi");
-    Serial.print("At IP:");
+    Serial.println("\nConnected to WiFi");
+    Serial.print("IP Address: ");
     Serial.println(WiFi.localIP());
 }
 
 IPAddress MDNSSetup() {
-    // Use mDNS to find the server
     if (!MDNS.begin("esp32client")) {
-      Serial.println("Error starting MDNS on client");
+        Serial.println("Error starting MDNS on client");
     }
-    // Resolve server's mDNS hostname to IP
     Serial.println("Resolving server...");
     IPAddress serverIP = MDNS.queryHost("esp32server");
     return serverIP;
 }
 
-void ComsSetup(IPAddress serverIP){
-    if(serverIP != IPAddress()) {
+void ComsSetup(IPAddress serverIP) {
+    if (serverIP != IPAddress()) {
         Serial.print("Server found at: ");
         Serial.println(serverIP);
-    
+
         if (client.connect(serverIP, 8080)) {
             Serial.println("Connected to server.");
-
-            // Send a message to the server
             client.println("Hello from Client");
-
-            // Wait for a response
             String response = client.readStringUntil('\n');
             Serial.println("Server response: " + response);
         }
     } else {
-    Serial.println("Server not found.");
+        Serial.println("Server not found.");
     }
 }
 
-void Checkmessage(){
-    String response = client.readStringUntil('\n');
-    response.trim();
-    Serial.println(response);
-    if(response == "Alert"){
-      alerted = true;
-    }
-    if (response == "Stop")
-    {
-      alerted = false;
+void Checkmessage() {
+    if (client.available()) {
+        String response = client.readStringUntil('\n');
+        response.trim();
+        Serial.println(response);
+        if (response == "Alert") {
+            alerted = true;
+        }
+        if (response == "Stop") {
+            alerted = false;
+        }
     }
 }
 
-int LED = 4;
-unsigned long previousMillis = 0;
-const long interval = 1000;  // Interval for blinking the LED
-bool ledState = LOW;
-
-void Alert() {
+// Fonction pour le chemin lumineux
+void PathLights() {
     unsigned long currentMillis = millis();
-    if (currentMillis - previousMillis >= interval) {
-        previousMillis = currentMillis;
-        ledState = !ledState;
-        digitalWrite(LED, ledState);
+    if (currentMillis - pathPreviousMillis >= pathInterval) {
+        pathPreviousMillis = currentMillis;
+
+        // Alterner l'état des LEDs
+        if (pathState == 0) {
+            digitalWrite(LED1, HIGH);
+            digitalWrite(LED2, LOW);
+        } else if (pathState == 1) {
+            digitalWrite(LED1, LOW);
+            digitalWrite(LED2, HIGH);
+        } else if (pathState == 2) {
+            digitalWrite(LED1, LOW);
+            digitalWrite(LED2, LOW);
+        }
+        pathState = (pathState + 1) % 3; // Passer à l'état suivant
     }
 }
 
+// Fonction pour le code Morse SOS
+void MorseSOS() {
+    unsigned long currentMillis = millis();
+    if (currentMillis - morsePreviousMillis >= morseUnit) {
+        morsePreviousMillis = currentMillis;
+
+        // Appliquer l'état du pattern Morse
+        if (morsePattern[morseIndex] == 1) { // Allumer pour une unité courte
+            digitalWrite(LED_MORSE, HIGH);
+        } else if (morsePattern[morseIndex] == 3) { // Allumer pour une unité longue
+            digitalWrite(LED_MORSE, HIGH);
+            delay(morseUnit); // Temps supplémentaire pour un long
+        } else { // Éteindre
+            digitalWrite(LED_MORSE, LOW);
+        }
+
+        morseIndex++;
+        if (morseIndex >= sizeof(morsePattern) / sizeof(morsePattern[0])) {
+            morseIndex = 0; // Recommencer le pattern
+        }
+    }
+}
+
+// Fonction principale d'alerte
+void Alert() {
+    PathLights();
+    MorseSOS();
+}
 
 void setup() {
-    //base Setup
+    // Configuration de base
     Serial.begin(9600);
-    pinMode(LED, OUTPUT);
-    WiFiSetup();
+    pinMode(LED1, OUTPUT);
+    pinMode(LED2, OUTPUT);
+    pinMode(LED_MORSE, OUTPUT);
 
-    //Card connection
+    WiFiSetup();
     SIPA = MDNSSetup();
     ComsSetup(SIPA);
 }
 
 void loop() {
-    if(client.connected()){
-      Checkmessage();
+    if (client.connected()) {
+        Checkmessage();
+    } else {
+        ComsSetup(SIPA);
     }
-    else {
-      //client does not detect server deconnection
-      //does not reconnect once the server back online
-      ComsSetup(SIPA);
-    }
-    if(alerted){
+
+    if (alerted) {
         Alert();
+    } else {
+        // Éteindre les LEDs si aucune alerte n'est active
+        digitalWrite(LED1, LOW);
+        digitalWrite(LED2, LOW);
+        digitalWrite(LED_MORSE, LOW);
     }
-    else {
-      if(ledState)
-        digitalWrite(LED, LOW);
-    }
+
     delay(20);
 }
