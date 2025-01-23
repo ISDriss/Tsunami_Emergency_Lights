@@ -4,8 +4,6 @@
 #include <Adafruit_SSD1306.h>
 #include "../credentials.h"
 
-#define LED 10
-
 //WiFiServer server(8080);
 IPAddress SIPA;
 WiFiClient client;
@@ -57,20 +55,29 @@ void ComsSetup(IPAddress serverIP){
 
 void Checkmessage(){
     String response = client.readStringUntil('\n');
+    response.trim();
     Serial.println(response);
     if(response == "Alert"){
-        alerted = true;
+      alerted = true;
     }
-    else if (response == "Stop")
+    if (response == "Stop")
     {
-        alerted = false;
+      alerted = false;
     }
 }
 
-void Alert(){
-    digitalWrite(LED, HIGH);
-    delay(1000);
-    digitalWrite(LED, LOW);
+int LED = 4;
+unsigned long previousMillis = 0;
+const long interval = 1000;  // Interval for blinking the LED
+bool ledState = LOW;
+
+void Alert() {
+    unsigned long currentMillis = millis();
+    if (currentMillis - previousMillis >= interval) {
+        previousMillis = currentMillis;
+        ledState = !ledState;
+        digitalWrite(LED, ledState);
+    }
 }
 
 
@@ -86,9 +93,6 @@ void setup() {
 }
 
 void loop() {
-    if(alerted){
-        Alert();
-    }
     if(client.connected()){
       Checkmessage();
     }
@@ -96,6 +100,13 @@ void loop() {
       //client does not detect server deconnection
       //does not reconnect once the server back online
       ComsSetup(SIPA);
+    }
+    if(alerted){
+        Alert();
+    }
+    else {
+      if(ledState)
+        digitalWrite(LED, LOW);
     }
     delay(20);
 }
