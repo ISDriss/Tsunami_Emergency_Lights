@@ -5,7 +5,7 @@
 // Configuration des pins
 #define LED1 4  // Première LED du chemin lumineux
 #define LED2 2  // Deuxième LED du chemin lumineux
-#define LED_MORSE 9  // LEDs en série pour le code Morse
+#define LED_MORSE 0  // LEDs en série pour le code Morse
 
 // Variables globales
 IPAddress SIPA;
@@ -23,7 +23,7 @@ unsigned long morsePreviousMillis = 0;
 int morseIndex = 0;
 bool morseState = false;
 const int morsePattern[] = {1, 0, 1, 0, 1, 0, 3, 0, 3, 0, 3, 0, 1, 0, 1, 0, 1, 0}; // "SOS" en Morse
-const int morseUnit = 1000; // Durée d'une unité Morse (1000 ms)
+const int morseUnit = 200; // Durée d'une unité Morse (200 ms)
 
 void WiFiSetup() {
     WiFi.begin(ssid, password);
@@ -105,17 +105,22 @@ void MorseSOS() {
 
         // Appliquer l'état du pattern Morse
         if (morsePattern[morseIndex] == 1) { // Allumer pour une unité courte
+            Serial.println("dot");
             digitalWrite(LED_MORSE, HIGH);
+            
         } else if (morsePattern[morseIndex] == 3) { // Allumer pour une unité longue
+            Serial.println("line");
             digitalWrite(LED_MORSE, HIGH);
             delay(morseUnit); // Temps supplémentaire pour un long
         } else { // Éteindre
+            Serial.println("off");
             digitalWrite(LED_MORSE, LOW);
         }
 
         morseIndex++;
         if (morseIndex >= sizeof(morsePattern) / sizeof(morsePattern[0])) {
             morseIndex = 0; // Recommencer le pattern
+            delay(morseUnit*10); // Temps supplémentaire pour un long
         }
     }
 }
