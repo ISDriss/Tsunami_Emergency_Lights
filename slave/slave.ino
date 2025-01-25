@@ -111,7 +111,7 @@ void MorseSOS() {
         } else if (morsePattern[morseIndex] == 3) { // Allumer pour une unité longue
             Serial.println("line");
             digitalWrite(LED_MORSE, HIGH);
-            delay(morseUnit); // Temps supplémentaire pour un long
+            delay(morseUnit*3); // Temps supplémentaire pour un long
         } else { // Éteindre
             Serial.println("off");
             digitalWrite(LED_MORSE, LOW);
@@ -120,7 +120,7 @@ void MorseSOS() {
         morseIndex++;
         if (morseIndex >= sizeof(morsePattern) / sizeof(morsePattern[0])) {
             morseIndex = 0; // Recommencer le pattern
-            delay(morseUnit*10); // Temps supplémentaire pour un long
+            delay(morseUnit*5); // Temps supplémentaire pour un long
         }
     }
 }
